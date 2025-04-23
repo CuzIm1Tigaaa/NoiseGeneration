@@ -1,0 +1,4 @@
+target/
+.idea/
+*.iml
+src/main/java/de/cuzim1tigaaa/console/
