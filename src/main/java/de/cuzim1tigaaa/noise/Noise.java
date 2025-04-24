@@ -7,6 +7,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Point2D;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -43,6 +44,8 @@ public class Noise {
 		Map<Integer, Color> colors = new HashMap<>();
 		List<Double> noiseValues = new ArrayList<>();
 
+		Map<Integer, List<Point2D.Double>> mixPoints = new HashMap<>();
+
 		int halfWidth = WIDTH / 2, halfHeight = HEIGHT / 2;
 		for(int x = -halfWidth; x < halfWidth; x++) {
 			for(int z = -halfHeight; z < halfHeight; z++) {
@@ -61,10 +64,6 @@ public class Noise {
 				color = (erosLevel + 2) * 16;
 				eros[x + halfWidth][z + halfHeight] = new Color(color, color, color).getRGB();
 
-				double weirdness = getLayeredNoise(weirdnessNoise, x, z, WEIRDNESS_SCALE, 5, .15);
-				int weirdLevel = (int) ((weirdness + 1) * 255 / 2);
-				weird[x + halfWidth][z + halfHeight] = new Color(weirdLevel, weirdLevel, weirdLevel).getRGB();
-
 				double continentalness = getLayeredNoise(continentNoise, x, z, CONTINENT_SCALE, 4, .35);
 				int contLevel = TerraUtils.classifyContinentalnessLevel(continentalness);
 				Color c = TerraUtils.classifyContinentalColor(contLevel);
@@ -74,14 +73,58 @@ public class Noise {
 				weirdnessValue = 1 - Math.abs(3 * Math.abs(weirdnessValue) - 2);
 				color = (int) ((weirdnessValue + 1) * 255 / 2);
 				weird[x + halfWidth][z + halfHeight] = new Color(color, color, color).getRGB();
+
+				double contSpline = new SplineTesting(TerraUtils.contX, TerraUtils.contY).calcSpline(continentalness);
+				double erosSpline = new SplineTesting(TerraUtils.erosX, TerraUtils.erosY).calcSpline(erosion);
+				double weirdSpline = new SplineTesting(TerraUtils.weirdX, TerraUtils.weirdY).calcSpline(weirdnessValue);
+
+				mixPoints.computeIfAbsent(z, k -> new ArrayList<>())
+						.add(new Point2D.Double(x, ((contSpline * 1.25) + (erosSpline * .75) + weirdSpline) * TerraUtils.BASE_HEIGHT));
 			}
 		}
 
-		openPanel("Temperature", temp);
-		openPanel("Humidity", hum);
-		openPanel("Erosion", eros);
-		openPanel("Continentalness", cont);
-		openPanel("Weirdness", weird);
+		int z = -halfHeight;
+		while(true) {
+			Map<Color, List<Point2D.Double>> points = new HashMap<>();
+			points.put(new Color(255, 127, 0), mixPoints.get(z));
+
+			drawGraph("Graph", points);
+			Thread.sleep(100);
+			z++;
+			if(z > halfHeight) {
+				z = -halfHeight;
+			}
+		}
+
+
+		// drawGraph("Height Map", mixPointsByColor);
+
+		// openPanel("Temperature", temp);
+		// openPanel("Humidity", hum);
+		// openPanel("Erosion", eros);
+		// openPanel("Continentalness", cont);
+		// openPanel("Weirdness", weird);
+	}
+
+	private static JFrame frame;
+	private static GraphPanel graphPanel;
+
+	private static void drawGraph(String title, Map<Color, List<Point2D.Double>> graph) {
+		if(frame == null) {
+			SwingUtilities.invokeLater(() -> {
+				frame = new JFrame(title);
+				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+				graphPanel = new GraphPanel();
+				graphPanel.addPoint(graph);
+				frame.add(graphPanel);
+				frame.pack();
+				frame.setLocationRelativeTo(null);
+				frame.setVisible(true);
+			});
+			return;
+		}
+
+		SwingUtilities.invokeLater(() -> graphPanel.addPoint(graph));
 	}
 
 	private static void openPanel(String title, int[][] vals) throws InterruptedException {
@@ -113,33 +156,33 @@ public class Noise {
 		return octaveGenerator.noise(x, z, frequency, amplitude, true);
 	}
 
-	private static List<Point> contSpline() {
+	private static List<PointX> contSpline() {
 		return List.of(
-				new Point(-1.2, 0.05),   // Mushroom Fields: shallow terrain
-				new Point(-0.8, 0.02),   // Deep Ocean: very low
-				new Point(-0.5, 0.08),   // Mid-Ocean
-				new Point(-0.25, 0.12),  // Shallow Ocean
-				new Point(-0.12, 0.20),  // Coast: gentle rise
-				new Point(0.0, 0.35),   // Near-Inland: noticeable elevation
-				new Point(0.2, 0.55),   // Mid-Inland: moderate height
-				new Point(0.4, 0.70),   // Early Far-Inland
-				new Point(0.7, 0.85),   // Hills
-				new Point(1.0, 0.92)    // High Inland plateau
+				new PointX(-1.2, 0.05),   // Mushroom Fields: shallow terrain
+				new PointX(-0.8, 0.02),   // Deep Ocean: very low
+				new PointX(-0.5, 0.08),   // Mid-Ocean
+				new PointX(-0.25, 0.12),  // Shallow Ocean
+				new PointX(-0.12, 0.20),  // Coast: gentle rise
+				new PointX(0.0, 0.35),   // Near-Inland: noticeable elevation
+				new PointX(0.2, 0.55),   // Mid-Inland: moderate height
+				new PointX(0.4, 0.70),   // Early Far-Inland
+				new PointX(0.7, 0.85),   // Hills
+				new PointX(1.0, 0.92)    // High Inland plateau
 		);
 	}
 
-	private static List<Point> erosSpline() {
+	private static List<PointX> erosSpline() {
 		return List.of(
-				new Point(-1.0, 0.95),   // Very jagged terrain
-				new Point(-0.85, 0.90),
-				new Point(-0.65, 0.75),  // Tall peaks
-				new Point(-0.4, 0.65),   // High hills
-				new Point(-0.2, 0.50),   // Smooth hills
-				new Point(0.0, 0.35),   // Gentle slopes
-				new Point(0.3, 0.25),   // Plains
-				new Point(0.5, 0.15),   // Flatter areas
-				new Point(0.7, 0.05),   // Depressions / valleys
-				new Point(1.0, 0.0)     // Extreme erosion, flat and low
+				new PointX(-1.0, 0.95),   // Very jagged terrain
+				new PointX(-0.85, 0.90),
+				new PointX(-0.65, 0.75),  // Tall peaks
+				new PointX(-0.4, 0.65),   // High hills
+				new PointX(-0.2, 0.50),   // Smooth hills
+				new PointX(0.0, 0.35),   // Gentle slopes
+				new PointX(0.3, 0.25),   // Plains
+				new PointX(0.5, 0.15),   // Flatter areas
+				new PointX(0.7, 0.05),   // Depressions / valleys
+				new PointX(1.0, 0.0)     // Extreme erosion, flat and low
 		);
 	}
 

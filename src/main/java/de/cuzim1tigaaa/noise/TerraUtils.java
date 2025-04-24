@@ -4,6 +4,15 @@ import java.awt.*;
 
 public class TerraUtils {
 
+	public static final double BASE_HEIGHT = 64.0;
+
+	public static double[] contX = new double[]{-1.2, -1.05, -.455, -.19, -.11, .03, .3, 1.0},
+			contY = new double[]{.45, .05, .1, .3, .56, .6, .9, 1.0},
+			erosX = new double[]{-1.0, -0.78, -0.375, -0.2225, 0.05, 0.45, 0.55, 1.0},
+			erosY = new double[]{1., .7, .75, .2, .13, .3, .11, .1},
+			weirdX = new double[]{-1.0, -0.85, -0.15, 0.2, 0.7, 1.0},
+			weirdY = new double[]{0., .17, .2, .75, .73, .76};
+
 	public static int getTemperatureLevel(double temp) {
 		temp = Math.min(1.0, Math.max(-1.0, temp));
 
